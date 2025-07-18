@@ -107,6 +107,10 @@ export const useDepartments = () => {
   const loadDepartments = async () => {
     try {
       setError(null);
+      
+      // Set RLS bypass for service operations
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error: deptError } = await supabase
         .from('departments')
         .select('*')
@@ -129,6 +133,7 @@ export const useDepartments = () => {
   const addDepartment = async (departmentData: Omit<Department, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       setError(null);
+      
       const dbDepartment = convertToDatabase(departmentData);
       
       const { data, error } = await supabase
