@@ -1,7 +1,37 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { PlacementRecord, Student } from '../types';
-import { useDepartments } from './departmentUtils';
+
+// Helper function to convert Excel date serial to YYYY-MM-DD format
+const convertExcelDateToString = (value: string): string => {
+  if (!value) return '';
+  
+  // Check if the value is a numeric Excel date serial
+  const numericValue = parseFloat(value);
+  if (!isNaN(numericValue) && numericValue > 1) {
+    try {
+      // Convert Excel serial date to JavaScript Date
+      const excelDate = XLSX.SSF.parse_date_code(numericValue);
+      if (excelDate) {
+        // Format as YYYY-MM-DD
+        const year = excelDate.y;
+        const month = String(excelDate.m).padStart(2, '0');
+        const day = String(excelDate.d).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    } catch (error) {
+      console.warn('Failed to parse Excel date:', value, error);
+    }
+  }
+  
+  // If it's already a string date, try to parse and format it
+  const dateObj = new Date(value);
+  if (!isNaN(dateObj.getTime())) {
+    return dateObj.toISOString().split('T')[0];
+  }
+  
+  return '';
+};
 
 export const exportToExcel = (data: any[], filename: string = 'placement_data.xlsx') => {
   const worksheet = XLSX.utils.json_to_sheet(data);
@@ -103,7 +133,7 @@ export const parseExcelFile = (file: File): Promise<Student[]> => {
           const department = getValue(row, 'department');
           const section = getValue(row, 'section') || 'A';
           const gender = getValue(row, 'gender') as 'Male' | 'Female' | 'Other' | undefined;
-          const dateOfBirth = getValue(row, 'dateOfBirth');
+          const dateOfBirth = convertExcelDateToString(getValue(row, 'dateOfBirth'));
           const numberOfBacklogs = parseNumber(getValue(row, 'numberOfBacklogs'), 0);
           const resumeLink = getValue(row, 'resumeLink');
           const photoUrl = getValue(row, 'photoUrl');
@@ -158,7 +188,7 @@ export const parseExcelFile = (file: File): Promise<Student[]> => {
           // Add placement record if student is placed and has placement data
           const company = getValue(row, 'company');
           const packageValue = parseNumber(getValue(row, 'package'), 0);
-          const placementDate = getValue(row, 'placementDate');
+          const placementDate = convertExcelDateToString(getValue(row, 'placementDate'));
 
           if (status === 'placed' && company && packageValue > 0) {
             student.placementRecord = {
