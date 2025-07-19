@@ -21,6 +21,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, onSave, ment
   const [showPassword, setShowPassword] = useState(false);
 
   const departments = [
+    'Cyber Security',
+    'Gaming Technology',
     'Computer Science',
     'Information Technology',
     'Electronics & Communication',
