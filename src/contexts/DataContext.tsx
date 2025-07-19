@@ -409,7 +409,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const { data, error } = await supabase
         .from('students')
-        .insert(dbStudents)
+        .upsert(dbStudents, { onConflict: 'roll_number' })
         .select();
 
       if (error) throw error;
