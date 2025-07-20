@@ -1,58 +1,167 @@
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
-import { PlacementRecord, Student } from '../types';
 
-// Helper function to convert Excel date serial to YYYY-MM-DD format
-const convertExcelDateToString = (value: string): string => {
-  if (!value) return '';
+// Helper function to export data to CSV
+export function exportToCSV(data: any[], filename: string = 'export.csv'): void {
+  if (!data || data.length === 0) {
+    console.warn('No data to export');
+    return;
+  }
+
+  // Get headers from the first object
+  const headers = Object.keys(data[0]);
   
-  // Check if the value is a numeric Excel date serial
-  const numericValue = parseFloat(value);
-  if (!isNaN(numericValue) && numericValue > 1) {
-    try {
-      // Convert Excel serial date to JavaScript Date
-      const excelDate = XLSX.SSF.parse_date_code(numericValue);
-      if (excelDate) {
-        // Format as YYYY-MM-DD
-        const year = excelDate.y;
-        const month = String(excelDate.m).padStart(2, '0');
-        const day = String(excelDate.d).padStart(2, '0');
+  // Create CSV content
+  const csvContent = [
+    // Header row
+    headers.join(','),
+    // Data rows
+    ...data.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        // Handle values that contain commas or quotes
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value || '';
+      }).join(',')
+    )
+  ].join('\n');
+
+  // Create and download the file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Helper function to export data to Excel
+export function exportToExcel(data: any[], filename: string = 'export.xlsx'): void {
+  if (!data || data.length === 0) {
+    console.warn('No data to export');
+    return;
+  }
+
+  // Create worksheet from JSON data
+  const ws = XLSX.utils.json_to_sheet(data);
+  
+  // Create workbook and add worksheet
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  
+  // Write file
+  XLSX.writeFile(wb, filename);
+}
+
+// Helper function to convert Excel date serial to YYYY-MM-DD string
+function convertExcelDateToString(excelDate: any): string | null {
+  if (!excelDate) return null;
+  
+  try {
+    // If it's already a string, return as is
+    if (typeof excelDate === 'string') {
+      return excelDate;
+    }
+    
+    // If it's a number (Excel date serial), convert it
+    if (typeof excelDate === 'number') {
+      const date = XLSX.SSF.parse_date_code(excelDate);
+      if (date) {
+        const year = date.y;
+        const month = String(date.m).padStart(2, '0');
+        const day = String(date.d).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
-    } catch (error) {
-      console.warn('Failed to parse Excel date:', value, error);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error converting Excel date:', error);
+    return null;
+  }
+}
+
+// Helper function to map department names to active departments
+function mapDepartmentName(importedDept: string, availableDepartments: any[] = []): string {
+  if (!importedDept || !availableDepartments.length) {
+    return availableDepartments[0]?.name || 'Computer Science';
+  }
+
+  const deptLower = importedDept.toLowerCase().trim();
+  
+  // Department mapping with common variations
+  const departmentMappings: { [key: string]: string[] } = {
+    'Computer Science': ['cs', 'cse', 'computer science', 'computer science and engineering', 'comp sci', 'computer science engineering'],
+    'Information Technology': ['it', 'info tech', 'information technology', 'information tech'],
+    'Electronics & Communication': ['ece', 'electronics', 'electronics and communication', 'electronics and communication engineering', 'electronics & communication'],
+    'Mechanical Engineering': ['me', 'mech', 'mechanical', 'mechanical engineering'],
+    'Civil Engineering': ['ce', 'civil', 'civil engineering'],
+    'Electrical Engineering': ['ee', 'electrical', 'electrical engineering'],
+    'Chemical Engineering': ['che', 'chemical', 'chemical engineering'],
+    'Biotechnology': ['bt', 'biotech', 'biotechnology'],
+  };
+
+  // First try exact match with available departments
+  for (const dept of availableDepartments) {
+    if (dept.name.toLowerCase() === deptLower) {
+      return dept.name;
     }
   }
-  
-  // If it's already a string date, try to parse and format it
-  const dateObj = new Date(value);
-  if (!isNaN(dateObj.getTime())) {
-    return dateObj.toISOString().split('T')[0];
+
+  // Then try mapping variations
+  for (const [standardName, variations] of Object.entries(departmentMappings)) {
+    if (variations.includes(deptLower)) {
+      // Find if this standard name exists in available departments
+      const matchedDept = availableDepartments.find(dept => 
+        dept.name.toLowerCase().includes(standardName.toLowerCase()) ||
+        standardName.toLowerCase().includes(dept.name.toLowerCase())
+      );
+      if (matchedDept) {
+        return matchedDept.name;
+      }
+    }
   }
-  
-  return '';
-};
 
-export const exportToExcel = (data: any[], filename: string = 'placement_data.xlsx') => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+  // Fallback to partial matching
+  for (const dept of availableDepartments) {
+    if (dept.name.toLowerCase().includes(deptLower) || deptLower.includes(dept.name.toLowerCase())) {
+      return dept.name;
+    }
+  }
 
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  const data_blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  
-  saveAs(data_blob, filename);
-};
+  // If no match found, return the first available department
+  return availableDepartments[0]?.name || 'Unknown';
+}
 
-export const exportToCSV = (data: any[], filename: string = 'placement_data.csv') => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const csv = XLSX.utils.sheet_to_csv(worksheet);
-  const data_blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  
-  saveAs(data_blob, filename);
-};
+// Helper function to convert UG percentage from 100 scale to 10 scale
+function convertUGPercentageToScale10(value: number): number {
+  if (value > 10) {
+    return Number((value / 10).toFixed(2));
+  }
+  return value;
+}
 
-export const parseExcelFile = (file: File): Promise<Student[]> => {
+// Helper function to determine eligibility based on academic performance
+function determineEligibility(tenthPercentage: number, twelfthPercentage: number, ugPercentage: number, cgpa?: number): string {
+  const minTenth = 60;
+  const minTwelfth = 60;
+  const minUG = 6.0; // Out of 10
+  const minCGPA = 6.0; // Out of 10
+
+  if (tenthPercentage >= minTenth && 
+      twelfthPercentage >= minTwelfth && 
+      ugPercentage >= minUG && 
+      (!cgpa || cgpa >= minCGPA)) {
+    return 'eligible';
+  }
+  return 'ineligible';
+}
+
+export function parseStudentsFromExcel(file: File, availableDepartments: any[] = []): Promise<any[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -64,146 +173,40 @@ export const parseExcelFile = (file: File): Promise<Student[]> => {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        // Define column mappings - multiple possible names for each field
-        const columnMappings = {
-          rollNumber: ['Roll Number', 'rollNumber', 'roll_number', 'Roll No', 'RollNumber', 'Student ID', 'ID'],
-          studentName: ['Student Name', 'studentName', 'student_name', 'Name', 'Full Name', 'StudentName'],
-          email: ['Email', 'email', 'Email Address', 'email_address', 'EmailAddress', 'E-mail'],
-          personalEmail: ['Personal Email', 'personalEmail', 'personal_email', 'Personal Mail', 'PERSONAL  MAIL ID', 'Personal Mail ID', 'Personal E-mail'],
-          mobileNumber: ['Mobile Number', 'mobileNumber', 'mobile_number', 'Phone', 'phone', 'Mobile', 'Contact', 'Phone Number'],
-          department: ['Department', 'department', 'Dept', 'dept', 'Branch', 'branch'],
-          section: ['Section', 'section', 'Class', 'class'],
-          gender: ['Gender', 'gender', 'GENDER', 'Sex'],
-          dateOfBirth: ['Date of Birth', 'dateOfBirth', 'date_of_birth', 'DOB', 'Birth Date', 'Date Of Birth'],
-          numberOfBacklogs: ['Number of Backlogs', 'numberOfBacklogs', 'number_of_backlogs', 'Backlogs', 'NO OF BACKLOG', 'No of Backlogs', 'Backlog Count'],
-          resumeLink: ['Resume Link', 'resumeLink', 'resume_link', 'Resume URL', 'RESUME LINK', 'CV Link', 'Resume'],
-          photoUrl: ['Photo URL', 'photoUrl', 'photo_url', 'Photo Link', 'pHoto', 'Photo', 'Image URL', 'Picture'],
-          mentorId: ['Mentor ID', 'mentorId', 'mentor_id', 'Mentor', 'mentor', 'MentorID'],
-          tenthPercentage: ['10th Percentage', 'tenthPercentage', 'tenth_percentage', '10th %', '10th', 'Class 10', 'SSC'],
-          twelfthPercentage: ['12th Percentage', 'twelfthPercentage', 'twelfth_percentage', '12th %', '12th', 'Class 12', 'HSC', 'Intermediate'],
-          ugPercentage: ['UG Percentage', 'ugPercentage', 'ug_percentage', 'UG %', 'UG', 'Graduation', 'CGPA', 'GPA'],
-          cgpa: ['CGPA', 'cgpa', 'GPA', 'gpa', 'Grade Point Average', 'Cumulative GPA'],
-          status: ['Status', 'status', 'Placement Status', 'Student Status'],
-          company: ['Company', 'company', 'Company Name', 'Employer', 'Organization'],
-          package: ['Package (LPA)', 'package', 'Package', 'Salary', 'CTC', 'Annual Package', 'Package LPA'],
-          placementDate: ['Placement Date', 'placementDate', 'placement_date', 'Date of Placement', 'Joining Date']
-        };
-
-        // Function to find the correct column name from the Excel data
-        const findColumnName = (possibleNames: string[], excelColumns: string[]): string | null => {
-          for (const possibleName of possibleNames) {
-            const found = excelColumns.find(col => 
-              col.toLowerCase().trim() === possibleName.toLowerCase().trim()
-            );
-            if (found) return found;
-          }
-          return null;
-        };
-
-        // Get all column names from the Excel file
-        const excelColumns = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
-        
-        // Map Excel columns to our field names
-        const columnMap: Record<string, string | null> = {};
-        Object.entries(columnMappings).forEach(([fieldName, possibleNames]) => {
-          columnMap[fieldName] = findColumnName(possibleNames, excelColumns);
-        });
-
-        // Helper function to safely get value from row
-        const getValue = (row: any, fieldName: string): string => {
-          const columnName = columnMap[fieldName];
-          if (!columnName || !row[columnName]) return '';
-          return String(row[columnName]).trim();
-        };
-
-        // Helper function to safely parse number
-        const parseNumber = (value: string, defaultValue: number = 0): number => {
-          if (!value) return defaultValue;
-          const parsed = parseFloat(value);
-          return isNaN(parsed) ? defaultValue : parsed;
-        };
-
-        const students: Student[] = jsonData.map((row: any, index: number) => {
-          // Extract data using flexible column matching
-          const rollNumber = getValue(row, 'rollNumber') || `IMP${Date.now()}${index}`;
-          const studentName = getValue(row, 'studentName');
-          const email = getValue(row, 'email');
-          const personalEmail = getValue(row, 'personalEmail');
-          const mobileNumber = getValue(row, 'mobileNumber');
-          const department = getValue(row, 'department');
-          const section = getValue(row, 'section') || 'A';
-          const gender = getValue(row, 'gender') as 'Male' | 'Female' | 'Other' | undefined;
-          const dateOfBirth = convertExcelDateToString(getValue(row, 'dateOfBirth'));
-          const numberOfBacklogs = parseNumber(getValue(row, 'numberOfBacklogs'), 0);
-          const resumeLink = getValue(row, 'resumeLink');
-          const photoUrl = getValue(row, 'photoUrl');
-          const mentorId = getValue(row, 'mentorId') || 'mentor_1_1'; // Default to first mentor
+        const students = jsonData.map((row: any) => {
+          // Convert UG percentage from 100 scale to 10 scale
+          const rawUGValue = Number(row['UG Percentage'] || row['UG CGPA'] || row['ug_percentage'] || row['ugPercentage'] || row['CGPA'] || row['cgpa'] || 0);
+          const ugPercentage = convertUGPercentageToScale10(rawUGValue);
           
-          // Extract academic details with safe parsing
-          const tenthPercentage = parseNumber(getValue(row, 'tenthPercentage'), 0);
-          const twelfthPercentage = parseNumber(getValue(row, 'twelfthPercentage'), 0);
-          const ugPercentage = parseNumber(getValue(row, 'ugPercentage'), 0);
-          const cgpa = parseNumber(getValue(row, 'cgpa'), 0);
+          // Handle separate CGPA field if provided
+          const rawCGPAValue = row['CGPA'] || row['cgpa'];
+          const cgpa = rawCGPAValue ? convertUGPercentageToScale10(Number(rawCGPAValue)) : null;
 
-          // Determine eligibility based on academic performance
-          let status: 'placed' | 'eligible' | 'higher_studies' | 'ineligible' = 'eligible';
-          const importedStatus = getValue(row, 'status').toLowerCase();
-          
-          if (tenthPercentage < 60 || twelfthPercentage < 60 || ugPercentage < 60) {
-            status = 'ineligible';
-          } else if (importedStatus === 'higher_studies' || importedStatus === 'higher studies') {
-            status = 'higher_studies';
-          } else if (importedStatus === 'placed') {
-            status = 'placed';
-          } else {
-            status = 'eligible';
-          }
-
-          const student: Student = {
-            id: `import_${Date.now()}_${index}`,
-            rollNumber,
-            studentName,
-            email,
-            personalEmail: personalEmail || undefined,
-            mobileNumber,
-            department,
-            section,
-            gender: gender || undefined,
-            dateOfBirth: dateOfBirth || undefined,
-            numberOfBacklogs: numberOfBacklogs || undefined,
-            resumeLink: resumeLink || undefined,
-            photoUrl: undefined, // Photos will be uploaded separately through the UI
-            mentorId,
-            academicDetails: {
-              tenthPercentage,
-              twelfthPercentage,
+          const student = {
+            roll_number: String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || ''),
+            student_name: String(row['NAME'] || row['Student Name'] || row['student_name'] || row['Name'] || row['Full Name'] || ''),
+            email: String(row['OFFICIAL MAIL.ID'] || row['Email'] || row['Official Email'] || row['email'] || ''),
+            personal_email: String(row['PERSONAL  MAIL ID'] || row['Personal Email'] || row['personal_email'] || ''),
+            mobile_number: String(row['MOBILE NUMBER'] || row['Mobile Number'] || row['Phone'] || row['mobile_number'] || ''),
+            department: mapDepartmentName(String(row['Department'] || row['department'] || ''), availableDepartments),
+            section: String(row['Section'] || row['section'] || 'A'),
+            gender: String(row['GENDER'] || row['Gender'] || row['Sex'] || row['gender'] || ''),
+            date_of_birth: convertExcelDateToString(row['DOB'] || row['Date of Birth'] || row['Birth Date'] || row['date_of_birth']),
+            number_of_backlogs: Number(row['NO OF BACKLOG'] || row['Number of Backlogs'] || row['Backlogs'] || row['number_of_backlogs'] || 0),
+            resume_link: String(row['RESUME LINK'] || row['Resume Link'] || row['CV Link'] || row['resume_link'] || ''),
+            photo_url: String(row['pHoto'] || row['Photo URL'] || row['Photo Link'] || row['Image URL'] || row['photo_url'] || ''),
+            mentor_id: String(row['Mentor ID'] || row['mentor_id'] || availableDepartments[0]?.mentors?.[0]?.id || ''),
+            tenth_percentage: Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0),
+            twelfth_percentage: Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0),
+            ug_percentage: ugPercentage,
+            cgpa: cgpa,
+            status: determineEligibility(
+              Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0),
+              Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0),
               ugPercentage,
-              cgpa: cgpa || undefined,
-            },
-            status,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+              cgpa
+            )
           };
-
-          // Add placement record if student is placed and has placement data
-          const company = getValue(row, 'company');
-          const packageValue = parseNumber(getValue(row, 'package'), 0);
-          const placementDate = convertExcelDateToString(getValue(row, 'placementDate'));
-
-          if (status === 'placed' && company && packageValue > 0) {
-            student.placementRecord = {
-              id: `placement_import_${Date.now()}_${index}`,
-              studentName: student.studentName,
-              rollNumber: student.rollNumber,
-              department: student.department,
-              company,
-              package: packageValue,
-              placementDate: placementDate || new Date().toISOString().split('T')[0],
-              mentorId: student.mentorId,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-          }
 
           return student;
         });
@@ -217,86 +220,66 @@ export const parseExcelFile = (file: File): Promise<Student[]> => {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
-};
+}
 
-// Template generator for Excel import
-export const generateExcelTemplate = (departmentNames?: string[]) => {
-  // Use provided department names or fallback to default
-  const departments = departmentNames || [
-    'Computer Science',
-    'Information Technology', 
-    'Electronics & Communication',
-    'Mechanical Engineering'
-  ];
-  
-  const templateData = [
+export function parsePlacementsFromExcel(file: File): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        const placements = jsonData.map((row: any) => ({
+          student_id: String(row['Student ID'] || row['student_id'] || ''),
+          company_name: String(row['Company Name'] || row['company_name'] || ''),
+          job_role: String(row['Job Role'] || row['job_role'] || ''),
+          package_lpa: Number(row['Package (LPA)'] || row['package_lpa'] || 0),
+          placement_date: convertExcelDateToString(row['Placement Date'] || row['placement_date']),
+          placement_type: String(row['Placement Type'] || row['placement_type'] || 'full_time'),
+          status: String(row['Status'] || row['status'] || 'placed')
+        }));
+
+        resolve(placements);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+export function generateExcelTemplate(): void {
+  const studentTemplate = [
     {
-      'Roll Number': '2024CS001',
+      'Roll Number': 'CS001',
       'Student Name': 'John Doe',
-      'Email': 'john.doe@student.university.edu',
-      'PERSONAL  MAIL ID': 'john.personal@gmail.com',
-      'Mobile Number': '+1-555-0123',
-      'Department': departments[0],
+      'Email': 'john.doe@college.edu',
+      'Personal Email': 'john.doe@gmail.com',
+      'Mobile Number': '9876543210',
+      'Department': 'Computer Science',
       'Section': 'A',
-      'GENDER': 'Male',
-      'DOB': '2002-05-15',
-      'NO OF BACKLOG': '0',
-      'RESUME LINK': 'https://drive.google.com/file/d/sample-resume',
-      'pHoto': 'https://example.com/photos/john.jpg',
-      'Mentor ID': '2',
-      '10th Percentage': '85.5',
-      '12th Percentage': '78.2',
-      'CGPA': '8.2',
-      'Status': 'placed',
-      'Company': 'Google',
-      'Package (LPA)': '15.5',
-      'Placement Date': '2024-03-15'
-    },
-    {
-      'Roll Number': '2024IT002',
-      'Student Name': 'Jane Smith',
-      'Email': 'jane.smith@student.university.edu',
-      'PERSONAL  MAIL ID': 'jane.personal@gmail.com',
-      'Mobile Number': '+1-555-0124',
-      'Department': departments[1] || 'Information Technology',
-      'Section': 'B',
-      'GENDER': 'Female',
-      'DOB': '2002-08-22',
-      'NO OF BACKLOG': '1',
-      'RESUME LINK': 'https://drive.google.com/file/d/sample-resume-2',
-      'pHoto': 'https://example.com/photos/jane.jpg',
-      'Mentor ID': '3',
-      '10th Percentage': '92.0',
-      '12th Percentage': '88.5',
-      'CGPA': '9.1',
-      'Status': 'eligible',
-      'Company': '',
-      'Package (LPA)': '',
-      'Placement Date': ''
-    },
-    {
-      'Roll Number': '2024ME003',
-      'Student Name': 'Mike Johnson',
-      'Email': 'mike.johnson@student.university.edu',
-      'PERSONAL  MAIL ID': 'mike.personal@gmail.com',
-      'Mobile Number': '+1-555-0125',
-      'Department': departments[2] || 'Mechanical Engineering',
-      'Section': 'C',
-      'GENDER': 'Male',
-      'DOB': '2001-12-10',
-      'NO OF BACKLOG': '0',
-      'RESUME LINK': 'https://drive.google.com/file/d/sample-resume-3',
-      'pHoto': 'https://example.com/photos/mike.jpg',
-      'Mentor ID': '4',
-      '10th Percentage': '65.0',
-      '12th Percentage': '70.5',
-      'CGPA': '7.5',
-      'Status': 'higher_studies',
-      'Company': '',
-      'Package (LPA)': '',
-      'Placement Date': ''
+      'Gender': 'Male',
+      'Date of Birth': '2000-01-15',
+      'Number of Backlogs': 0,
+      'Resume Link': 'https://example.com/resume.pdf',
+      'Photo URL': 'https://example.com/photo.jpg',
+      'Mentor ID': 'MENTOR001',
+      '10th Percentage': 85.5,
+      '12th Percentage': 88.2,
+      'UG Percentage': 75.8,
+      'CGPA': 7.58
     }
   ];
 
-  exportToExcel(templateData, 'student_import_template.xlsx');
-};
+  const ws = XLSX.utils.json_to_sheet(studentTemplate);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Students');
+  XLSX.writeFile(wb, 'student_template.xlsx');
+}
