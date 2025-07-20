@@ -312,7 +312,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('placement_records')
         .select('*')
         .eq('student_id', id)
-        .maybeSingle();
+        .single();
 
       const updatedStudentData = convertDatabaseStudent(data, placementData);
       setStudents(prev => prev.map(student => 
