@@ -211,7 +211,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit, onDelete, onAddPlac
                   <div className="text-xs">
                     <div>10th: {student.academicDetails.tenthPercentage}%</div>
                     <div>12th: {student.academicDetails.twelfthPercentage}%</div>
-                    <div>UG: {student.academicDetails.ugPercentage}%</div>
+                    <div>UG: {student.academicDetails.ugPercentage}</div>
                     {student.academicDetails.cgpa && (
                       <div>CGPA: {student.academicDetails.cgpa}</div>
                     )}
