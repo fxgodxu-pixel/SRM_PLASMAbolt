@@ -165,9 +165,7 @@ const StudentModal: React.FC<StudentModalProps> = ({ isOpen, onClose, onSave, st
     const ugEligible = ugPercentage >= 6.0; // UG out of 10
     const cgpaEligible = !cgpa || cgpa >= 6.0; // CGPA check only if provided
     
-    if (tenthPercentage >= 60 && twelfthPercentage >= 60 && ugEligible && cgpaEligible) {
-      finalStatus = 'eligible';
-    } else {
+    if (tenthPercentage < 60 || twelfthPercentage < 60 || !ugEligible || !cgpaEligible) {
       finalStatus = 'ineligible';
     }
 
