@@ -160,9 +160,12 @@ const StudentModal: React.FC<StudentModalProps> = ({ isOpen, onClose, onSave, st
     const ugPercentage = parseFloat(formData.ugPercentage);
     const cgpa = formData.cgpa ? parseFloat(formData.cgpa) : undefined;
 
-    // Determine eligibility based on academic performance
+    // Determine eligibility based on academic performance (UG is out of 10)
     let finalStatus = formData.status;
-    if (tenthPercentage < 60 || twelfthPercentage < 60 || ugPercentage < 60) {
+    const ugEligible = ugPercentage >= 6.0; // UG out of 10
+    const cgpaEligible = !cgpa || cgpa >= 6.0; // CGPA check only if provided
+    
+    if (tenthPercentage < 60 || twelfthPercentage < 60 || !ugEligible || !cgpaEligible) {
       finalStatus = 'ineligible';
     }
 
@@ -427,18 +430,18 @@ const StudentModal: React.FC<StudentModalProps> = ({ isOpen, onClose, onSave, st
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  UG Percentage *
+                  UG CGPA (out of 10) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  max="100"
+                  max="10"
                   required
                   value={formData.ugPercentage}
                   onChange={(e) => setFormData({ ...formData, ugPercentage: e.target.value })}
                   className="input-field"
-                  placeholder="e.g., 72.8"
+                  placeholder="e.g., 7.74"
                 />
               </div>
 
@@ -560,7 +563,12 @@ const StudentModal: React.FC<StudentModalProps> = ({ isOpen, onClose, onSave, st
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> Students with less than 60% in any of 10th, 12th, or UG will be automatically marked as ineligible for placement.
+              <strong>Eligibility Rules:</strong> Students must have:
+              <br />• 10th Percentage ≥ 60%
+              <br />• 12th Percentage ≥ 60% 
+              <br />• UG CGPA ≥ 6.0 (out of 10)
+              <br />• CGPA ≥ 6.0 (if provided)
+              <br />Students not meeting these criteria will be automatically marked as ineligible for placement.
             </p>
           </div>
 
