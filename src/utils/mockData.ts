@@ -104,7 +104,7 @@ function generateMobileNumber(): string {
 
 function determineEligibility(academicDetails: { tenthPercentage: number; twelfthPercentage: number; ugPercentage: number }): 'eligible' | 'ineligible' {
   const { tenthPercentage, twelfthPercentage, ugPercentage } = academicDetails;
-  return (tenthPercentage >= 60 && twelfthPercentage >= 60 && ugPercentage >= 6.0) ? 'eligible' : 'ineligible';
+  return (tenthPercentage >= 60 && twelfthPercentage >= 60 && ugPercentage >= 60) ? 'eligible' : 'ineligible';
 }
 
 export function generateMockStudents(mentorIds?: string[]): Student[] {
