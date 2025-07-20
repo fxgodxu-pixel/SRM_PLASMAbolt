@@ -105,9 +105,9 @@ function mapDepartmentName(importedDept: string, availableDepartments: any[] = [
     'Biotechnology': ['bt', 'biotech', 'biotechnology'],
   };
 
-  // First try exact match with available departments
+  // First try exact match with available departments (name or code)
   for (const dept of availableDepartments) {
-    if (dept.name.toLowerCase() === deptLower) {
+    if (dept.name.toLowerCase() === deptLower || dept.code.toLowerCase() === deptLower) {
       return dept.name;
     }
   }
@@ -118,7 +118,8 @@ function mapDepartmentName(importedDept: string, availableDepartments: any[] = [
       // Find if this standard name exists in available departments
       const matchedDept = availableDepartments.find(dept => 
         dept.name.toLowerCase().includes(standardName.toLowerCase()) ||
-        standardName.toLowerCase().includes(dept.name.toLowerCase())
+        standardName.toLowerCase().includes(dept.name.toLowerCase()) ||
+        dept.code.toLowerCase() === variations.find(v => v === deptLower)
       );
       if (matchedDept) {
         return matchedDept.name;
@@ -128,7 +129,10 @@ function mapDepartmentName(importedDept: string, availableDepartments: any[] = [
 
   // Fallback to partial matching
   for (const dept of availableDepartments) {
-    if (dept.name.toLowerCase().includes(deptLower) || deptLower.includes(dept.name.toLowerCase())) {
+    if (dept.name.toLowerCase().includes(deptLower) || 
+        deptLower.includes(dept.name.toLowerCase()) ||
+        dept.code.toLowerCase().includes(deptLower) ||
+        deptLower.includes(dept.code.toLowerCase())) {
       return dept.name;
     }
   }
