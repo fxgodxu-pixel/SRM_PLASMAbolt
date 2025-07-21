@@ -182,7 +182,11 @@ export function parseStudentsFromExcel(file: File, availableDepartments: any[] =
           const rawCGPAValue = row['CGPA'] || row['cgpa'];
           const cgpa = rawCGPAValue ? convertUGPercentageToScale10(Number(rawCGPAValue)) : null;
 
+          const tenthPercentage = Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0);
+          const twelfthPercentage = Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0);
+
           const student = {
+            id: String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || ''),
             roll_number: String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || ''),
             student_name: String(row['NAME'] || row['Student Name'] || row['student_name'] || row['Name'] || row['Full Name'] || ''),
             email: String(row['OFFICIAL MAIL.ID'] || row['Email'] || row['Official Email'] || row['email'] || ''),
@@ -196,16 +200,15 @@ export function parseStudentsFromExcel(file: File, availableDepartments: any[] =
             resume_link: String(row['RESUME LINK'] || row['Resume Link'] || row['CV Link'] || row['resume_link'] || ''),
             photo_url: String(row['pHoto'] || row['Photo URL'] || row['Photo Link'] || row['Image URL'] || row['photo_url'] || ''),
             mentor_id: String(row['Mentor ID'] || row['mentor_id'] || availableDepartments[0]?.mentors?.[0]?.id || ''),
-            tenth_percentage: Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0),
-            twelfth_percentage: Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0),
-            ug_percentage: ugPercentage,
-            cgpa: cgpa,
-            status: determineEligibility(
-              Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0),
-              Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0),
-              ugPercentage,
-              cgpa
-            )
+            academicDetails: {
+              tenthPercentage: tenthPercentage,
+              twelfthPercentage: twelfthPercentage,
+              ugPercentage: ugPercentage,
+              cgpa: cgpa
+            },
+            status: determineEligibility(tenthPercentage, twelfthPercentage, ugPercentage, cgpa),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           };
 
           return student;
