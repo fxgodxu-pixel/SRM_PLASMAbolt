@@ -173,7 +173,7 @@ export function parseStudentsFromExcel(file: File, availableDepartments: any[] =
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        const students = jsonData.map((row: any) => {
+        const students = jsonData.map((row: any, index: number) => {
           // Convert UG percentage from 100 scale to 10 scale
           const rawUGValue = Number(row['UG Percentage'] || row['UG CGPA'] || row['ug_percentage'] || row['ugPercentage'] || row['CGPA'] || row['cgpa'] || 0);
           const ugPercentage = convertUGPercentageToScale10(rawUGValue);
@@ -225,22 +225,6 @@ export function parseStudentsFromExcel(file: File, availableDepartments: any[] =
             twelfth_percentage: twelfthPercentage,
             ug_percentage: ugPercentage,
             cgpa: cgpa,
-            status: determineEligibility(tenthPercentage, twelfthPercentage, ugPercentage, cgpa),
-          };
-
-          return student;
-        });
-
-        resolve(students);
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
-  });
-}
             academicDetails: {
               tenthPercentage: tenthPercentage,
               twelfthPercentage: twelfthPercentage,
