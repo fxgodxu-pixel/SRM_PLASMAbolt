@@ -185,21 +185,29 @@ export function parseStudentsFromExcel(file: File, availableDepartments: any[] =
           const tenthPercentage = Number(row['10th Percentage'] || row['10th %'] || row['Class 10'] || row['SSC'] || row['tenth_percentage'] || 0);
           const twelfthPercentage = Number(row['12th Percentage'] || row['12th %'] || row['HSC'] || row['Intermediate'] || row['twelfth_percentage'] || 0);
 
+          // Generate fallback values for required fields
+          const rollNumber = String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || '').trim() || `STUDENT_${Date.now()}_${index}`;
+          const studentName = String(row['NAME'] || row['Student Name'] || row['student_name'] || row['Name'] || row['Full Name'] || '').trim() || `Student ${index + 1}`;
+          const email = String(row['OFFICIAL MAIL.ID'] || row['Email'] || row['Official Email'] || row['email'] || '').trim() || `student${index + 1}@example.com`;
+          const mobileNumber = String(row['MOBILE NUMBER'] || row['Mobile Number'] || row['Phone'] || row['mobile_number'] || '').trim() || '0000000000';
+          const department = mapDepartmentName(String(row['Department'] || row['department'] || ''), availableDepartments) || 'Computer Science';
+          const section = String(row['Section'] || row['section'] || '').trim() || 'A';
+          const mentorId = String(row['Mentor ID'] || row['mentor_id'] || '').trim() || availableDepartments[0]?.mentors?.[0]?.id || 'DEFAULT_MENTOR';
           const student = {
-            id: String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || ''),
-            roll_number: String(row['REG NO'] || row['Roll Number'] || row['roll_number'] || row['Student ID'] || row['ID'] || ''),
-            student_name: String(row['NAME'] || row['Student Name'] || row['student_name'] || row['Name'] || row['Full Name'] || ''),
-            email: String(row['OFFICIAL MAIL.ID'] || row['Email'] || row['Official Email'] || row['email'] || ''),
+            id: rollNumber,
+            roll_number: rollNumber,
+            student_name: studentName,
+            email: email,
             personal_email: String(row['PERSONAL  MAIL ID'] || row['Personal Email'] || row['personal_email'] || ''),
-            mobile_number: String(row['MOBILE NUMBER'] || row['Mobile Number'] || row['Phone'] || row['mobile_number'] || ''),
-            department: mapDepartmentName(String(row['Department'] || row['department'] || ''), availableDepartments),
-            section: String(row['Section'] || row['section'] || 'A'),
+            mobile_number: mobileNumber,
+            department: department,
+            section: section,
             gender: String(row['GENDER'] || row['Gender'] || row['Sex'] || row['gender'] || ''),
             date_of_birth: convertExcelDateToString(row['DOB'] || row['Date of Birth'] || row['Birth Date'] || row['date_of_birth']),
             number_of_backlogs: Number(row['NO OF BACKLOG'] || row['Number of Backlogs'] || row['Backlogs'] || row['number_of_backlogs'] || 0),
             resume_link: String(row['RESUME LINK'] || row['Resume Link'] || row['CV Link'] || row['resume_link'] || ''),
             photo_url: String(row['pHoto'] || row['Photo URL'] || row['Photo Link'] || row['Image URL'] || row['photo_url'] || ''),
-            mentor_id: String(row['Mentor ID'] || row['mentor_id'] || availableDepartments[0]?.mentors?.[0]?.id || ''),
+            mentor_id: mentorId,
             academicDetails: {
               tenthPercentage: tenthPercentage,
               twelfthPercentage: twelfthPercentage,
